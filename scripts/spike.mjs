@@ -7,6 +7,7 @@ import { stdin, stdout } from 'node:process';
 import dotenv from 'dotenv';
 import { MetricCollector, csvColumns, csvLine } from '../src/signals/metrics.mjs';
 import { analyzeCapture } from '../src/signals/analysis.mjs';
+import { redactDiagnostic } from '../src/diagnostics.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const durationMs = 180_000;
@@ -25,8 +26,9 @@ if (!apiKey) {
   console.error('Missing SMARTSPECTRA_API_KEY. Set it in local .env. Camera remains off.');
   process.exit(1);
 }
-// Do not emit exception messages, native debug logs, buffers, or configuration containing credentials.
+// Preserve useful failures only after redaction; never emit native debug logs or config objects.
 const redact = (text) => String(text).replaceAll(apiKey, '[redacted]');
+const diagnosticText = (text) => redactDiagnostic(text, [apiKey]);
 console.log(`Sur — three-minute LIVE camera spike (not synthetic).
 Measures breathing waveforms, candidate pulse timing, pulse and HRV.
 Processing uses Presage's SDK. Optional telemetry is disabled; authentication,
@@ -109,10 +111,11 @@ try {
     if (code !== validationCode) { validationCode = code; console.log(`Validation ${code}: ${redact(hint)}`); }
   });
   sdk.on('processingStatus', (code) => write(eventRow('processing', '', { code })));
-  sdk.on('error', (code, _message, retryable) => {
-    sdkErrors.push({ code, retryable });
-    write(eventRow('sdk_error', '', { code, hint: `retryable=${retryable}; no automatic retry` }));
-    console.error(`SDK error code ${code}. Stopping; raw message withheld to protect credentials.`);
+  sdk.on('error', (code, message, retryable) => {
+    const diagnostic = diagnosticText(message);
+    sdkErrors.push({ code, retryable, message: diagnostic });
+    write(eventRow('sdk_error', '', { code, hint: `retryable=${retryable}; ${diagnostic}; no automatic retry` }));
+    console.error(`SDK error code ${code}. Stopping. Redacted diagnostic: ${diagnostic}`);
     void finish('sdk-error', true);
   });
   sdk.on('metrics', (buffer, ts) => {
@@ -137,8 +140,10 @@ try {
       console.log(`ON-AIR ${seconds}/180s — ${Math.floor(seconds / 5) % 2 ? 'EXHALE' : 'INHALE'} gently. Ctrl+C: STOP.`);
     }, 5000);
   }
-} catch {
-  console.error('Spike initialization failed. No retry or synthetic fallback. Exception text withheld to protect credentials.');
+} catch (error) {
+  const diagnostic = diagnosticText(error?.message);
+  sdkErrors.push({ code: error?.code, message: diagnostic });
+  console.error(`Spike initialization failed. No retry or synthetic fallback. Redacted diagnostic: ${diagnostic}`);
   if (csv) await finish('initialization-failed', true);
   else process.exitCode = 1;
 }
