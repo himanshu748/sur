@@ -6,6 +6,8 @@ Sur is a planned desktop breathing-practice app for people who want a calm way t
 
 **Current state: day-one headless spike only. The live attempt failed early; the Electron app is not built.** See [SPIKE.md](SPIKE.md) for evidence and the unresolved RSA decision. Development is paused pending the owner's go-ahead.
 
+A separately approved [SDK investigation](SDK_INVESTIGATION.md) found a usage-verification network failure and native teardown crash. The account remains Free; cardio provisioning has not been verified. The spike now preserves redacted SDK error messages for diagnosis.
+
 *Demo GIF placeholder — replace with a real recording after the app works. No demo exists yet.*
 
 ## Run the spike

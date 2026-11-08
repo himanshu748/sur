@@ -2,6 +2,8 @@
 
 **Do not build the full app yet. RSA feasibility is unresolved.** The real default-camera attempt stopped after **45.6766 seconds**, before the requested three minutes, on SDK error **8 (`kProcessingFailed`, retryable)**. No retry or synthetic substitution was made.
 
+**Follow-up:** a separately approved diagnostic later hit usage-verification `kNetworkError` (5) and a native teardown crash. Free-tier cardio provisioning is still unverified. See [SDK_INVESTIGATION.md](SDK_INVESTIGATION.md); the evidence below describes the original attempt.
+
 ## Evidence
 
 SmartSpectra **3.4.0** loaded and ran on macOS arm64 with Node **24.22.2**. The owner explicitly approved camera capture and the documented automatic transmission of derived vitals to Presage for Insights. Optional telemetry was disabled. The documented default-camera and breathing/cardio bundle APIs were used.
