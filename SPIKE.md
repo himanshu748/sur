@@ -1,51 +1,41 @@
-# Day-one spike: blocked, RSA feasibility unresolved
+# Day-one spike: blocked
 
-**Decision: do not build the full app yet.** One real default-camera attempt with SmartSpectra 3.4.0 stopped after **45.6766 seconds** on SDK error **8 (`kProcessingFailed`)**, marked retryable by the SDK. It did not complete the requested three minutes. No retry was made, following the owner's stop-on-SDK-failure instruction.
+**Do not build the full app yet. RSA feasibility is unresolved.** The real default-camera attempt stopped after **45.6766 seconds**, before the requested three minutes, on SDK error **8 (`kProcessingFailed`, retryable)**. No retry or synthetic substitution was made.
 
-## Observed evidence
+## Evidence
 
-The native binding loaded successfully on macOS arm64 with Node **24.22.2**. Capture used the documented `SmartSpectraSDK`, breathing/cardio bundles, `CameraSelection.default`, `useCamera`, `start`, `stopAsync` and `destroy` APIs. The owner explicitly approved the camera session and the disclosed automatic transmission of derived vitals to Presage for Insights. Optional telemetry was disabled; no upgrade or payment was made.
+SmartSpectra **3.4.0** loaded and ran on macOS arm64 with Node **24.22.2**. The owner explicitly approved camera capture and the documented automatic transmission of derived vitals to Presage for Insights. Optional telemetry was disabled. The documented default-camera and breathing/cardio bundle APIs were used.
 
-| Observation | Result |
-| --- | --- |
+| Captured output | Count |
+| --- | ---: |
 | Metrics callbacks | 435 |
-| Unique upper-chest samples | 544; none marked stable |
-| Lower-abdominal samples | 0 |
+| Unique upper-chest samples | 544; none stable |
 | Breathing-rate samples | 3 |
-| Arterial waveform samples | 0 |
-| Pulse samples | 0 |
-| HRV samples | 0; session shorter than the required 60-second window |
-| Derived candidate beats / eligible breath cycles | 0 / 0 |
-| Final state | Stop/destroy completed; process exited 1 |
+| Lower trace / arterial trace / pulse / HRV | 0 each |
+| Candidate beats / eligible breath cycles | 0 each |
 
-The CSV records validation hints including chest not visible, face position/orientation, multiple/no faces and insufficient frame rate. Those warnings indicate capture conditions were unsuitable. **They do not establish the cause of `kProcessingFailed`.** No live preview was built for this headless spike. The error callback's free-text message was deliberately not retained, so the exact native failure cause remains unknown. We have not established whether cardio provisioning, capture conditions or another SDK/runtime issue caused the missing cardio outputs.
+The SDK emitted framing, chest visibility, multiple/no-face, orientation and frame-rate warnings. These show unsuitable capture conditions, **not the cause of the processing error**. The raw error message was withheld to protect credentials, so the native failure cause is unknown. Cardio access/provisioning has not been established. HRV's 60-second window was never reached.
 
-Raw evidence remains local and git-ignored: `captures/2026-11-08T07-47-41.294Z/signals.csv` and `analysis.json`. The CSV contains 1,325 rows: 773 validation, 544 upper trace, 3 breathing rate, 4 processing status, and 1 SDK error. The JSON preserves elapsed time, counts and the failed outcome. Do not publish these physiological capture files. No video was saved.
+Stop/destroy completed and the process exited 1. Local, git-ignored evidence is in `captures/2026-11-08T07-47-41.294Z/signals.csv` and `analysis.json`. The CSV has 1,325 rows, including validation and processing status. No video was saved; captures and the key are excluded from commits.
 
-## Answer to the spike question
+## Can we see within-breath heart-rate changes?
 
-**We cannot yet determine whether beat-to-beat intervals are reliable enough to show within-breath heart-rate changes.** This attempt supplied no arterial data, so neither the peak detector nor RSA calculation was exercised on live cardio. The absence of data is not proof that the SDK cannot supply usable beat timing.
+**Not established.** No arterial samples arrived, so live beat intervals could not be evaluated. This does not prove the SDK cannot supply them.
 
-The experimental implementation detects arterial peaks, rejects unstable/low-confidence segments and gaps, limits candidate intervals to the documented pulse range (40–110 BPM), then measures the observed peak-to-trough candidate BPM in complete measured upper-chest cycles. Overlapping SDK packets are deduplicated per field by timestamp; all samples in each packet are considered. Breathing traces have `stable` but **no confidence field**; that verdict is inherited from breathing-rate stability. Arterial trace and HRV do carry confidence.
+The exploratory algorithm detects arterial peaks, derives candidate BPM from intervals, then averages observed peak-to-trough BPM within complete measured chest cycles. It rejects unstable segments, gaps and intervals outside 40–110 BPM. Breathing traces use their inherited `stable` verdict; they have no confidence field of their own. Packet samples are deduplicated by timestamp. Signal timing preserves SDK microsecond timestamps; receipt timing and the capture budget use monotonic `process.hrtime.bigint()`.
 
-Signal intervals use the SDK's per-sample microsecond timestamps, preserved without inventing a clock conversion. The SDK payload schema documents those timestamps as epoch microseconds. Callback timestamps are also preserved. Receipt timing and the three-minute budget use monotonic `process.hrtime.bigint()`, with wall clock used only for file naming. Callback arrival time is never substituted for heartbeat timing.
+**No live RSA method has been selected.** The proposed fallback—12-second averaged pulse trend aligned to breath phase, plus SDK RMSSD/SDNN per step—is also unverified because no pulse/HRV arrived. It is a smoothed proxy and cannot support literal heartbeat ticks. README makes this distinction explicit.
 
-**Fallback is also unresolved:** the proposed fallback is the SDK's 12-second average pulse trend aligned to measured breath phase, with RMSSD/SDNN per step. It is a smoothed proxy, not beat-to-beat RSA, and cannot support literal per-heartbeat tabla ticks. No pulse or HRV arrived here, so selecting that method now would also overstate the evidence. README states that no live method has been selected.
+## Tooling checks
 
-## Validation of the tooling
+- **Passed locally:** 10 labelled synthetic Vitest tests, lint, CLI help, noninteractive consent gate, secret/history and file-size checks; npm audit reports zero vulnerabilities. Logs are in ignored `local-evidence/`.
+- **Remote CI blocked:** [Actions run](https://github.com/himanshu748/sur/actions/runs/42460785554) never started. GitHub reports the account is locked due to a billing issue. No billing changes were made.
+- **Deferred:** Electron UI, audio, saved pace, SVG/PNG export, embed page and SVG tests.
 
-Local Node 24 runs passed **10 synthetic Vitest tests**, `npm run lint`, the CLI `--help` path and the noninteractive consent gate. Tests cover harmonic rejection on a constructed pulse trace, gaps, invalid samples, timestamp regressions, per-cycle peak-to-trough calculation, incomplete cycles, actual breathing-field shape, packet deduplication, HRV field preservation and CSV escaping. No synthetic data was substituted into the live run. Test and lint output is saved locally in `local-evidence/`.
+## Next step requires go-ahead
 
-`npm audit` is checked separately from camera feasibility. The minimatch override pins a patched release used by ESLint; lint/tests must pass with that resolution. GitHub Actions is configured for lint/tests only; no remote CI result is claimed. Full Electron UI, Web Audio, persisted pace, SVG/PNG export, embed page and SVG tests are deferred until the spike gate is resolved.
+Investigate the processing error with redacted diagnostics and confirm existing free-key cardio access. Then, only with fresh capture approval, repeat 180 seconds with stable framing and >=25 fps. Inspect stable cardio/breath outputs, gaps, peak shape and at least ten complete breath cycles before choosing a method. Independent beat-timing reference data would be needed to establish interval accuracy.
 
-## Next experiment, only with a new go-ahead
+Preserve two constraints: **4.5 breaths/min is outside the SDK's documented 5–40 range**, and automatic Insights prevent an offline-only privacy claim.
 
-1. Investigate `kProcessingFailed` using redacted SDK diagnostics and check that the existing free key permits cardio. Do not buy credits, change billing or open upstream issues.
-2. Fix framing and sustained >=25 fps lighting/setup, then explicitly start one fresh 180-second run at six breaths/min. Display a preview in a later app phase; do not invent a headless preview now.
-3. Require stable arterial, upper-chest, pulse and HRV outputs after their warm-up windows. Inspect sampling gaps and raw peak shape; test sensitivity to modest detector changes. Compare interval-derived average pulse with the SDK's averaged pulse, allowing for its window and delay.
-4. Inspect at least ten complete breath cycles and the interval-derived heart-rate curve. Check the observed relationship to breath phase instead of assuming an in-phase result. An independent beat-timing reference is needed before claiming beat-interval accuracy; the camera trace alone cannot establish that.
-5. Choose beat intervals only if the evidence supports them. Otherwise evaluate and explicitly label the pulse-trend/HRV proxy, including the possibility that its 12-second average cannot resolve the target cycle. If neither works, report that feasibility failed.
-
-Two design constraints remain visible: 4.5 breaths/min is outside the SDK's documented **5–40/min** breathing/waveform range, and automatic Insights mean the SDK is not an offline-only data path. A local-only product promise cannot currently be made.
-
-Sources checked 2026-11-08: [Node API](https://smartspectra.presagetech.com/docs/nodejs/api-reference.md), [metrics](https://smartspectra.presagetech.com/docs/nodejs/metrics.md), [payload schema](https://smartspectra.presagetech.com/docs/data-types.md), [measurement quality](https://smartspectra.presagetech.com/docs/measurement-quality.md), [model cards](https://smartspectra.presagetech.com/docs/model-cards-and-limitations.md), [automatic Insights](https://smartspectra.presagetech.com/docs/nodejs/llm-insights.md), [SDK privacy](https://presagetech.com/legal/privacy-policy). Error-code mapping was verified in the installed 3.4.0 `js/constants.js`.
+Sources checked 2026-11-08: [metrics](https://smartspectra.presagetech.com/docs/nodejs/metrics.md), [payload schema](https://smartspectra.presagetech.com/docs/data-types.md), [model cards](https://smartspectra.presagetech.com/docs/model-cards-and-limitations.md), [Insights](https://smartspectra.presagetech.com/docs/nodejs/llm-insights.md), [SDK privacy](https://presagetech.com/legal/privacy-policy). Error mapping was checked in installed SDK 3.4.0 `js/constants.js`.
