@@ -1,0 +1,15 @@
+{
+  "name": "sur",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Find your resonant breathing pace with a tanpura you play with your breath and heartbeat",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node scripts/spike.mjs",
+    "spike": "node scripts/spike.mjs",
+    "test": "vitest run",
+    "lint": "eslint ."
+  }
+}

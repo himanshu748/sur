@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+captures/
+local-evidence/
+coverage/
+dist/
+.DS_Store
+*.csv
+*.mp4
+*.mov
+*.webm
+*.log
